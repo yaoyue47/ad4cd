@@ -9,8 +9,9 @@ class Net(nn.Module):
     NeuralCDM
     '''
 
-    def __init__(self, student_n, exer_n, knowledge_n):
+    def __init__(self, student_n, exer_n, knowledge_n, time_graph):
         super(Net, self).__init__()
+        self.time_graph = time_graph
         self.knowledge_dim = knowledge_n
         self.exer_n = exer_n
         self.student_n = student_n
@@ -60,9 +61,9 @@ class Net(nn.Module):
             if 'weight' in name and "BN" not in name:
                 nn.init.xavier_normal_(param)
 
-    def forward(self, stu_id, exer_id, kn_emb, time_taken, skill_index, time_graph):
-        a = torch.index_select(time_graph, 0, stu_id)
-        b = torch.index_select(time_graph, 1, exer_id)
+    def forward(self, stu_id, exer_id, kn_emb, time_taken, skill_index):
+        a = torch.index_select(self.time_graph, 0, stu_id)
+        b = torch.index_select(self.time_graph, 1, exer_id)
 
         a = torch.bucketize(a, self.boundaries)
         b = torch.bucketize(b, self.boundaries)

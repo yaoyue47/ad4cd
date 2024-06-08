@@ -3,7 +3,7 @@ import sys
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
-from util.getGraph import getGraph
+from util.getGraph import Graph
 
 dataset = sys.argv[1]
 k_fold = sys.argv[2]  # 0-4
@@ -13,7 +13,7 @@ with open('data/' + dataset + '/num.json') as a:
     exer_n = b["problem_n"]
     knowledge_n = b["skill_n"]
     student_n = b["user_n"]
-    time_graph = getGraph(pd.read_csv(f"data/{dataset}/{dataset}.csv"), student_n, exer_n)
+    time_graph = Graph(pd.read_csv(f"data/{dataset}/{dataset}.csv"))
 
 
 class MyDataSet(Dataset):

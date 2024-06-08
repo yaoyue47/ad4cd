@@ -11,7 +11,7 @@ from loss_function import MyLossFunction
 
 epoch_n = 100
 
-net = Net(student_n, exer_n, knowledge_n)
+net = Net(student_n, exer_n, knowledge_n, time_graph)
 net = net.to(device)
 optimizer = optim.Adam(net.parameters(), lr=0.001)
 loss_function = MyLossFunction()
@@ -33,7 +33,7 @@ def train():
             device), skill_num.to(
             device), labels.to(device), time_taken.to(device), skill_index.to(device)
         optimizer.zero_grad()
-        output = net.forward(studentId, problemId, skill_num, time_taken, skill_index, time_graph)
+        output = net.forward(studentId, problemId, skill_num, time_taken, skill_index)
         loss = loss_function(output, labels)
         running_loss += loss.item()
         loss.backward()
@@ -51,7 +51,7 @@ def valid():
             studentId, problemId, skill_num, labels, time_taken, skill_index = i
             studentId, problemId, skill_num, labels, time_taken, skill_index = studentId.to(device), problemId.to(
                 device), skill_num.to(device), labels.to(device), time_taken.to(device), skill_index.to(device)
-            output = net.forward(studentId, problemId, skill_num, time_taken, skill_index, time_graph)
+            output = net.forward(studentId, problemId, skill_num, time_taken, skill_index)
             loss = loss_function(output, labels)
             running_loss += loss.item()
             for a in range(len(labels)):
@@ -78,4 +78,4 @@ if __name__ == '__main__':
     for epoch in range(epoch_n):
         train()
         valid()
-        torch.save(net, "model/" + dataset + f"/epoch{epoch + 1}.pth")
+        # torch.save(net, "model/" + dataset + f"/epoch{epoch + 1}.pth")
