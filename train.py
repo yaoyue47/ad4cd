@@ -15,7 +15,6 @@ net = Net(student_n, exer_n, knowledge_n, time_graph)
 net = net.to(device)
 optimizer = optim.Adam(net.parameters(), lr=0.001)
 loss_function = MyLossFunction()
-time_graph = time_graph.to(device)
 
 trainDataSet = MyDataSet("train")
 validDataset = MyDataSet("valid")
