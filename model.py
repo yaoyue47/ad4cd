@@ -1,7 +1,11 @@
+import sys
+
 import torch
 import torch.nn as nn
 from pyod.models.ecod import ECOD
+from baseCDM.NCD import NCD
 import warnings
+
 warnings.filterwarnings("ignore")
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -54,76 +58,81 @@ class Net(nn.Module):
         )
 
         # network structure
-        self.student_emb = nn.Embedding(self.student_n, self.knowledge_dim)
-        self.k_difficulty = nn.Embedding(self.exer_n, self.knowledge_dim)
-        self.e_discrimination = nn.Embedding(self.exer_n, 1)
+        self.baseCDM_type = sys.argv[3]
+        print(f"use {self.baseCDM_type} model")
+        assert self.baseCDM_type in ['NCD']
+        if self.baseCDM_type == 'NCD':
+            self.baseCDM = NCD(self.student_n, self.exer_n, self.knowledge_dim)
 
+        self.add_or_not = sys.argv[4] == "add"
+        if self.add_or_not:
+            print("add my additional framework")
+        else:
+            print("no additional charges")
         # initialization
         for name, param in self.named_parameters():
             if 'weight' in name and "BN" not in name:
                 nn.init.xavier_normal_(param)
 
     def forward(self, stu_id, exer_id, kn_emb, time_taken, skill_index):
+        output = None
 
-        attn_output_a = []
+        if self.baseCDM_type == 'NCD':
+            output = self.baseCDM(stu_id, exer_id, kn_emb)
 
-        for index, item in enumerate(stu_id):
-            a, i = self.time_graph.get_all_problem_time(item, time_taken[index])
-            a_embed = self.time_embedding(torch.bucketize(a.to(device), self.boundaries))
-            a = torch.unsqueeze(a, dim=1)
-            all_AD_result = ECOD().fit(a).decision_scores_
-            AD_result = all_AD_result[i]
-            all_AD_result = torch.tensor(all_AD_result, device=device)
-            AD_result = torch.tensor(AD_result, device=device)
-            weight = -torch.pow((all_AD_result - AD_result), 2)
-            weight = torch.softmax(weight, dim=0)
-            weight = torch.unsqueeze(weight, dim=1)
-            result = torch.mul(weight, a_embed)
-            result = torch.sum(result, dim=0)
-            result = torch.squeeze(result, dim=0)
-            attn_output_a.append(result)
-        attn_output_a = torch.stack(attn_output_a)
-        attn_output_a = torch.unsqueeze(attn_output_a, dim=1).float()
+        if self.add_or_not:
+            attn_output_a = []
 
-        attn_output_b = []
+            for index, item in enumerate(stu_id):
+                a, i = self.time_graph.get_all_problem_time(item, time_taken[index])
+                a_embed = self.time_embedding(torch.bucketize(a.to(device), self.boundaries))
+                a = torch.unsqueeze(a, dim=1)
+                all_AD_result = ECOD().fit(a).decision_scores_
+                AD_result = all_AD_result[i]
+                all_AD_result = torch.tensor(all_AD_result, device=device)
+                AD_result = torch.tensor(AD_result, device=device)
+                weight = -torch.pow((all_AD_result - AD_result), 2)
+                weight = torch.softmax(weight, dim=0)
+                weight = torch.unsqueeze(weight, dim=1)
+                result = torch.mul(weight, a_embed)
+                result = torch.sum(result, dim=0)
+                result = torch.squeeze(result, dim=0)
+                attn_output_a.append(result)
+            attn_output_a = torch.stack(attn_output_a)
+            attn_output_a = torch.unsqueeze(attn_output_a, dim=1).float()
 
-        for index, item in enumerate(exer_id):
-            a, i = self.time_graph.get_all_student_time(item, time_taken[index])
-            a_embed = self.time_embedding(torch.bucketize(a.to(device), self.boundaries))
-            a = torch.unsqueeze(a, dim=1)
-            all_AD_result = ECOD().fit(a).decision_scores_
-            AD_result = all_AD_result[i]
-            all_AD_result = torch.tensor(all_AD_result, device=device)
-            AD_result = torch.tensor(AD_result, device=device)
-            weight = -torch.pow((all_AD_result - AD_result), 2)
-            weight = torch.softmax(weight, dim=0)
-            weight = torch.unsqueeze(weight, dim=1)
-            result = torch.mul(weight, a_embed)
-            result = torch.sum(result, dim=0)
-            result = torch.squeeze(result, dim=0)
-            attn_output_b.append(result)
-        attn_output_b = torch.stack(attn_output_b)
-        attn_output_b = torch.unsqueeze(attn_output_b, dim=1).float()
+            attn_output_b = []
 
-        hint_embeding = self.hint_embedding(skill_index)
-        hint_embeding_new = self.hintBN(hint_embeding)
-        hint_embeding_new = self.hint_FC(hint_embeding_new)
-        hint_embeding_new = hint_embeding_new + hint_embeding
-        hint_embeding_new = torch.unsqueeze(hint_embeding_new, dim=1)
-        cat_data = torch.concat([attn_output_a, attn_output_b, hint_embeding_new], dim=1)
-        self_multihead_attn_output, self_multihead_attn_output_w = self.self_multihead_attn(cat_data, cat_data,
-                                                                                            cat_data)
-        self_multihead_attn_output = torch.reshape(self_multihead_attn_output, (self_multihead_attn_output.size(0), -1))
-        finally_data = self.FC(self_multihead_attn_output)
+            for index, item in enumerate(exer_id):
+                a, i = self.time_graph.get_all_student_time(item, time_taken[index])
+                a_embed = self.time_embedding(torch.bucketize(a.to(device), self.boundaries))
+                a = torch.unsqueeze(a, dim=1)
+                all_AD_result = ECOD().fit(a).decision_scores_
+                AD_result = all_AD_result[i]
+                all_AD_result = torch.tensor(all_AD_result, device=device)
+                AD_result = torch.tensor(AD_result, device=device)
+                weight = -torch.pow((all_AD_result - AD_result), 2)
+                weight = torch.softmax(weight, dim=0)
+                weight = torch.unsqueeze(weight, dim=1)
+                result = torch.mul(weight, a_embed)
+                result = torch.sum(result, dim=0)
+                result = torch.squeeze(result, dim=0)
+                attn_output_b.append(result)
+            attn_output_b = torch.stack(attn_output_b)
+            attn_output_b = torch.unsqueeze(attn_output_b, dim=1).float()
 
-        stu_emb = torch.sigmoid(self.student_emb(stu_id))
-        k_difficulty = torch.sigmoid(self.k_difficulty(exer_id))
-        e_discrimination = torch.sigmoid(self.e_discrimination(exer_id))
+            hint_embeding = self.hint_embedding(skill_index)
+            hint_embeding_new = self.hintBN(hint_embeding)
+            hint_embeding_new = self.hint_FC(hint_embeding_new)
+            hint_embeding_new = hint_embeding_new + hint_embeding
+            hint_embeding_new = torch.unsqueeze(hint_embeding_new, dim=1)
+            cat_data = torch.concat([attn_output_a, attn_output_b, hint_embeding_new], dim=1)
+            self_multihead_attn_output, self_multihead_attn_output_w = self.self_multihead_attn(cat_data, cat_data,
+                                                                                                cat_data)
+            self_multihead_attn_output = torch.reshape(self_multihead_attn_output, (self_multihead_attn_output.size(0), -1))
+            finally_data = self.FC(self_multihead_attn_output)
 
-        input_x = e_discrimination * (stu_emb - k_difficulty) * kn_emb * 10
-        input_x = torch.sum(input_x, 1)
-        output = torch.sigmoid(input_x)
-        output = output * finally_data[:, 0] + (1 - output) * finally_data[:, 1]
+            output = output * finally_data[:, 0] + (1 - output) * finally_data[:, 1]
         return output
 
     def get_knowledge_status(self, stu_id):
