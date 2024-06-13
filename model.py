@@ -6,6 +6,7 @@ from pyod.models.ecod import ECOD
 from baseCDM.NCD import NCD
 from baseCDM.KANCD import KANCD
 from baseCDM.DINA import DINA
+from baseCDM.KSCD import KSCD
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -62,13 +63,15 @@ class Net(nn.Module):
         # network structure
         self.baseCDM_type = sys.argv[3]
         print(f"use {self.baseCDM_type} model")
-        assert self.baseCDM_type in ['NCD', "KANCD", "DINA"]
+        assert self.baseCDM_type in ['NCD', "KANCD", "DINA", "KSCD"]
         if self.baseCDM_type == 'NCD':
             self.baseCDM = NCD(self.student_n, self.exer_n, self.knowledge_dim)
         if self.baseCDM_type == 'KANCD':
             self.baseCDM = KANCD(self.student_n, self.exer_n, self.knowledge_dim)
         if self.baseCDM_type == 'DINA':
             self.baseCDM = DINA(self.student_n, self.exer_n, self.knowledge_dim)
+        if self.baseCDM_type == 'KSCD':
+            self.baseCDM = KSCD(self.student_n, self.exer_n, self.knowledge_dim)
 
         self.add_or_not = sys.argv[4] == "add"
         if self.add_or_not:
@@ -88,6 +91,8 @@ class Net(nn.Module):
         if self.baseCDM_type == 'KANCD':
             output = self.baseCDM(stu_id, exer_id, kn_emb)
         if self.baseCDM_type == 'DINA':
+            output = self.baseCDM(stu_id, exer_id, kn_emb)
+        if self.baseCDM_type == 'KSCD':
             output = self.baseCDM(stu_id, exer_id, kn_emb)
 
         if self.add_or_not:
