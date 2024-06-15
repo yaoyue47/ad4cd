@@ -3,6 +3,10 @@ import sys
 import torch
 import torch.nn as nn
 from pyod.models.ecod import ECOD
+from pyod.models.iforest import IForest
+from pyod.models.knn import KNN
+from pyod.models.lof import LOF
+from pyod.models.ocsvm import OCSVM
 from baseCDM.NCD import NCD
 from baseCDM.KANCD import KANCD
 from baseCDM.DINA import DINA
@@ -84,6 +88,21 @@ class Net(nn.Module):
             print("add my additional framework")
         else:
             print("no additional charges")
+
+        self.baseAD_type = sys.argv[5]
+        print(f"use {self.baseAD_type} AD")
+        assert self.baseAD_type in ["ECOD", "IFOREST", "KNN", "LOF", "OCSVM"]
+        if self.baseAD_type == 'ECOD':
+            self.baseAD = ECOD()
+        if self.baseAD_type == 'IFOREST':
+            self.baseAD = IForest()
+        if self.baseAD_type == 'KNN':
+            self.baseAD = KNN(n_neighbors=1)
+        if self.baseAD_type == 'LOF':
+            self.baseAD = LOF()
+        if self.baseAD_type == 'OCSVM':
+            self.baseAD = OCSVM()
+
         # initialization
         for name, param in self.named_parameters():
             if 'weight' in name and "BN" not in name:
@@ -111,9 +130,13 @@ class Net(nn.Module):
             for index, item in enumerate(stu_id):
                 a, i = self.time_graph.get_all_problem_time(item, time_taken[index])
                 a_embed = self.time_embedding(torch.bucketize(a.to(device), self.boundaries))
-                a = torch.unsqueeze(a, dim=1)
-                all_AD_result = ECOD().fit(a).decision_scores_
-                AD_result = all_AD_result[i]
+                if a.size()[0] != 1:
+                    a = torch.unsqueeze(a, dim=1)
+                    all_AD_result = self.baseAD.fit(a).decision_scores_
+                    AD_result = all_AD_result[i]
+                else:
+                    all_AD_result = [1.0]
+                    AD_result = [1.0]
                 all_AD_result = torch.tensor(all_AD_result, device=device)
                 AD_result = torch.tensor(AD_result, device=device)
                 weight = -torch.pow((all_AD_result - AD_result), 2)
@@ -131,9 +154,13 @@ class Net(nn.Module):
             for index, item in enumerate(exer_id):
                 a, i = self.time_graph.get_all_student_time(item, time_taken[index])
                 a_embed = self.time_embedding(torch.bucketize(a.to(device), self.boundaries))
-                a = torch.unsqueeze(a, dim=1)
-                all_AD_result = ECOD().fit(a).decision_scores_
-                AD_result = all_AD_result[i]
+                if a.size()[0] != 1:
+                    a = torch.unsqueeze(a, dim=1)
+                    all_AD_result = self.baseAD.fit(a).decision_scores_
+                    AD_result = all_AD_result[i]
+                else:
+                    all_AD_result = [1.0]
+                    AD_result = [1.0]
                 all_AD_result = torch.tensor(all_AD_result, device=device)
                 AD_result = torch.tensor(AD_result, device=device)
                 weight = -torch.pow((all_AD_result - AD_result), 2)
