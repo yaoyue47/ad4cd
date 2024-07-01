@@ -77,4 +77,4 @@ if __name__ == '__main__':
     for epoch in range(epoch_n):
         train()
         valid()
-        # torch.save(net, "model/" + dataset + f"/epoch{epoch + 1}.pth")
+        torch.save(net, "model/" + f"/epoch{epoch + 1}.pth")
