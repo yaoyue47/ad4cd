@@ -32,8 +32,8 @@ def train():
             device), skill_num.to(
             device), labels.to(device), time_taken.to(device), skill_index.to(device)
         optimizer.zero_grad()
-        output = net.forward(studentId, problemId, skill_num, time_taken, skill_index)
-        loss = loss_function(output, labels)
+        output, recon_loss, mu, logvar = net.forward(studentId, problemId, skill_num, time_taken, skill_index)
+        loss = loss_function(output, recon_loss, mu, logvar, labels)
         running_loss += loss.item()
         loss.backward()
         optimizer.step()
@@ -50,8 +50,8 @@ def valid():
             studentId, problemId, skill_num, labels, time_taken, skill_index = i
             studentId, problemId, skill_num, labels, time_taken, skill_index = studentId.to(device), problemId.to(
                 device), skill_num.to(device), labels.to(device), time_taken.to(device), skill_index.to(device)
-            output = net.forward(studentId, problemId, skill_num, time_taken, skill_index)
-            loss = loss_function(output, labels)
+            output, recon_loss, mu, logvar = net.forward(studentId, problemId, skill_num, time_taken, skill_index)
+            loss = loss_function(output, recon_loss, mu, logvar, labels)
             running_loss += loss.item()
             for a in range(len(labels)):
                 if (labels[a] == 1 and output[a] > 0.5) or (labels[a] == 0 and output[a] < 0.5):
@@ -77,4 +77,4 @@ if __name__ == '__main__':
     for epoch in range(epoch_n):
         train()
         valid()
-        torch.save(net, "model/" + f"/epoch{epoch + 1}.pth")
+        # torch.save(net, "model/" + f"/epoch{epoch + 1}.pth")

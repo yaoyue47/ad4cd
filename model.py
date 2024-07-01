@@ -39,6 +39,25 @@ class Net(nn.Module):
         self.self_multihead_attn = nn.MultiheadAttention(128, 1, batch_first=True)
 
         self.hint_embedding = nn.Embedding(self.knowledge_dim, 128)
+        self.hint_s_embedding = nn.Embedding(self.student_n, 128)
+        self.vae_encode = nn.Sequential(
+            nn.Linear(self.knowledge_dim, 64),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(64, 16),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(16, 4),
+        )
+        self.vae_decode = nn.Sequential(
+            nn.Linear(2, 16),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(16, 64),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(64, self.knowledge_dim),
+        )
         self.hintBN = nn.BatchNorm1d(128)
         self.hint_FC = nn.Sequential(
             nn.Linear(128, 64),
@@ -108,8 +127,15 @@ class Net(nn.Module):
             if 'weight' in name and "BN" not in name:
                 nn.init.xavier_normal_(param)
 
+    def reparameterise(self, mu, logvar):
+        epsilon = torch.randn_like(mu)
+        return mu + epsilon * torch.exp(logvar / 2)
+
     def forward(self, stu_id, exer_id, kn_emb, time_taken, skill_index):
         output = None
+        recon_loss = torch.zeros(1, device=device)
+        mu = torch.zeros(1, device=device)
+        logvar = torch.zeros(1, device=device)
 
         if self.baseCDM_type == 'NCD':
             output = self.baseCDM(stu_id, exer_id, kn_emb)
@@ -174,6 +200,17 @@ class Net(nn.Module):
             attn_output_b = torch.unsqueeze(attn_output_b, dim=1).float()
 
             hint_embeding = self.hint_embedding(skill_index)
+            hint_s_embeding = self.hint_s_embedding(stu_id)
+            knowledge_low_emb = self.hint_embedding(torch.arange(self.knowledge_dim).to(hint_s_embeding.device))
+            stu_all_k_emb = torch.mm(hint_s_embeding, knowledge_low_emb.T)
+
+            stu_all_k_emb_a = self.vae_encode(stu_all_k_emb)
+            mu, logvar = stu_all_k_emb_a.chunk(2, dim=1)
+            z = self.reparameterise(mu, logvar)
+            stu_all_k_emb_recon = self.vae_decode(z)
+            recon_loss = torch.pow(stu_all_k_emb - stu_all_k_emb_recon, 2).sum(dim=1, keepdim=True) / self.knowledge_dim
+
+            hint_embeding = torch.mul(recon_loss, hint_embeding)
             hint_embeding_new = self.hintBN(hint_embeding)
             hint_embeding_new = self.hint_FC(hint_embeding_new)
             hint_embeding_new = hint_embeding_new + hint_embeding
@@ -186,7 +223,7 @@ class Net(nn.Module):
             finally_data = self.FC(self_multihead_attn_output)
 
             output = output * finally_data[:, 0] + (1 - output) * finally_data[:, 1]
-        return output
+        return output, recon_loss, mu, logvar
 
     def get_knowledge_status(self, stu_id):
         stat_emb = torch.sigmoid(self.student_emb(stu_id))
