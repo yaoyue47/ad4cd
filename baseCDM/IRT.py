@@ -14,15 +14,10 @@ class IRT(nn.Module):
         self.k_difficulty = nn.Embedding(self.exer_n, 1)
         self.e_discrimination = nn.Embedding(self.exer_n, 1)
 
-        # initialization
-        for name, param in self.named_parameters():
-            if 'weight' in name:
-                nn.init.xavier_normal_(param)
-
     def forward(self, stu_id, exer_id):
-        stu_emb = torch.sigmoid(self.student_emb(stu_id))
-        k_difficulty = torch.sigmoid(self.k_difficulty(exer_id))
-        e_discrimination = torch.sigmoid(self.e_discrimination(exer_id))
+        stu_emb = self.student_emb(stu_id)
+        k_difficulty = self.k_difficulty(exer_id)
+        e_discrimination = self.e_discrimination(exer_id)
 
         output = 1 / (1 + torch.exp(-e_discrimination * 1.7 * (stu_emb - k_difficulty)))
         output = torch.squeeze(output, dim=1)

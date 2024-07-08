@@ -6,7 +6,7 @@ class MIRT(nn.Module):
 
     def __init__(self, student_n, exer_n):
         super(MIRT, self).__init__()
-        self.num_dim = 19
+        self.num_dim = 2
         self._alpha_params = nn.Embedding(exer_n, self.num_dim)  # self.num_dim表示嵌入维度
         self._beta_params = nn.Embedding(exer_n, 1)
         self._theta_params = nn.Embedding(student_n, self.num_dim)
